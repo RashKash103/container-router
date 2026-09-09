@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add an **Open unmatched URLs in a container** preference so the container chooser can be turned off, containing only
+  the configured URL pattern mappings.
+
 ## [v1.0.10]
 
 - Replace the extension icon with a high-contrast shield and secured-container design, including high-DPI manifest support.

@@ -167,6 +167,24 @@
         }
     };
 
+    /*
+     * Containment of unmatched URLs is on by default. When the user turns it
+     * off, only URLs matching a container mapping are contained and every other
+     * URL loads normally instead of prompting for a container.
+     */
+    const shouldContainUnmatchedURL = async function (url) {
+        try {
+            debug("Fetching unmatched URL containment preference: ", url);
+            const {containUnmatchedUrls} = await browser.storage.sync.get({containUnmatchedUrls: true});
+            debug("Loaded unmatched URL containment preference: ", containUnmatchedUrls);
+            return containUnmatchedUrls !== false;
+        } catch (e) {
+            debug("Error fetching unmatched URL containment preference: ", e);
+            // if we cannot fetch the preference, we keep containing unmatched URLs
+            return true;
+        }
+    };
+
     const doURLContainerMatchSwitch = async function (url, currentTab) {
         // return true if multi account container is disabled
         if (!macAddonEnabled) {
@@ -348,6 +366,14 @@
         }
         if (response?.void) {
             debug("URL has container assigned... already in same : ", request.url);
+            return void 0;
+        }
+
+        // check if the user wants unmatched URLs contained at all. when this is
+        // turned off, the mappings above are the only URLs we contain.
+        debug("Checking if unmatched URLs should be contained: ", request.url);
+        if (!await shouldContainUnmatchedURL(request.url)) {
+            debug("Unmatched URL containment is disabled... Not doing anything: ", request.url);
             return void 0;
         }
 

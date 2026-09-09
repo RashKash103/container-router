@@ -1,4 +1,15 @@
 <template>
+    <section class="containment-settings">
+        <label>
+            <input type="checkbox" v-model="containUnmatchedUrls" @change="saveContainUnmatchedUrls"/>
+            Open unmatched URLs in a container
+        </label>
+        <p>
+            When enabled, every URL loaded outside a container asks which container to use unless it matches an
+            exception below. When disabled, only URLs matching a pattern mapping are contained, and every other URL
+            loads normally without a prompt.
+        </p>
+    </section>
     <table>
         <thead>
         <tr>
@@ -40,7 +51,9 @@
     <table>
         <thead>
         <tr>
-            <th colspan="3">URL Container Exceptions</th>
+            <th colspan="3">URL Container Exceptions
+                <span v-if="!containUnmatchedUrls" class="priority-hint">(unused while unmatched URLs are not contained)</span>
+            </th>
         </tr>
         </thead>
         <tbody>
@@ -167,6 +180,7 @@ export default {
             urlContainerMappings: [],
             urlExceptions: [],
             contextualIdentities: [],
+            containUnmatchedUrls: true,
             debugLogging: false,
             discoverySession: {
                 active: false,
@@ -205,10 +219,15 @@ export default {
         },
     },
     async mounted() {
-        const {urlContainerMappings, urlExceptions} = await browser.storage.sync.get({urlContainerMappings: [], urlExceptions: []})
+        const {urlContainerMappings, urlExceptions, containUnmatchedUrls} = await browser.storage.sync.get({
+            urlContainerMappings: [],
+            urlExceptions: [],
+            containUnmatchedUrls: true,
+        })
         const {debugLogging} = await browser.storage.local.get({debugLogging: false})
         this.urlContainerMappings = urlContainerMappings
         this.urlExceptions = urlExceptions
+        this.containUnmatchedUrls = containUnmatchedUrls !== false
         this.debugLogging = debugLogging
         browser.storage.onChanged.addListener(this.syncStorage)
         this.contextualIdentities = await browser.contextualIdentities.query({})
@@ -256,6 +275,11 @@ export default {
                 urlExceptions: toRaw(this.urlExceptions),
             })
         },
+        async saveContainUnmatchedUrls() {
+            await browser.storage.sync.set({
+                containUnmatchedUrls: this.containUnmatchedUrls,
+            })
+        },
         async saveDebugLogging() {
             await browser.storage.local.set({
                 debugLogging: this.debugLogging,
@@ -268,6 +292,9 @@ export default {
             }
             if (changes.urlExceptions) {
                 this.urlExceptions = changes.urlExceptions.newValue
+            }
+            if (changes.containUnmatchedUrls) {
+                this.containUnmatchedUrls = changes.containUnmatchedUrls.newValue !== false
             }
         },
         removeUrl(id) {
@@ -519,6 +546,7 @@ select:focus-visible {
     opacity: 0.7;
 }
 
+.containment-settings,
 .url-discovery,
 .debug-settings {
     margin: 20px 0;
@@ -617,10 +645,12 @@ code {
 
 .priority-hint,
 .tab-id,
+.containment-settings p,
 .debug-settings p {
     color: var(--muted-text-color);
 }
 
+.containment-settings p,
 .debug-settings p {
     margin-top: 6px;
 }

@@ -25,10 +25,19 @@ This extension can be installed at [addons.mozilla.org](https://addons.mozilla.o
 
 Any url patterns which are to be used with this extension should not have their hostnames assigned to the MAC addon.
 
+### Opening unmatched URLs in a container
+
+By default the extension asks which container to use for every URL loaded outside a container, unless the URL matches an
+exception. To only contain the URLs you have configured, open the extension preferences and clear **Open unmatched URLs
+in a container**. Every URL that does not match a pattern container mapping then loads normally, and the exceptions list
+is no longer consulted. The setting is synced with the rest of the configuration and is enabled by default.
+
 ### Exceptions
 
 Use the settings page to define url pattern exceptions for which the extension should not try to contain them.
 However if the MAC addon has the host configured to open in a container it may still try to open it in the assigned container.
+Exceptions only matter while **Open unmatched URLs in a container** is enabled, because that is the only mode in which
+unconfigured URLs are contained at all.
 
 ### Pattern Container Mappings
 
