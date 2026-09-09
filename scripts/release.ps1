@@ -101,7 +101,7 @@ try {
         throw "Tag $tag already exists."
     }
 
-    & gh release view $tag --repo RashKash103/container-sentry *> $null
+    & gh release view $tag --repo RashKash103/container-router *> $null
     if ($LASTEXITCODE -eq 0) {
         throw "GitHub Release $tag already exists."
     }
@@ -145,7 +145,7 @@ try {
     $runId = ''
     for ($attempt = 0; $attempt -lt 30 -and -not $runId; $attempt++) {
         $runId = Get-CheckedOutput gh run list `
-            --repo RashKash103/container-sentry `
+            --repo RashKash103/container-router `
             --workflow .github/workflows/build.yaml `
             --branch main `
             --commit $commit `
@@ -159,7 +159,7 @@ try {
     if (-not $runId) {
         throw "Timed out waiting for the GitHub Actions run for commit $commit."
     }
-    Invoke-Checked gh run watch $runId --repo RashKash103/container-sentry --exit-status
+    Invoke-Checked gh run watch $runId --repo RashKash103/container-router --exit-status
 
     Invoke-Checked git tag $tag
     Invoke-Checked git push origin $tag
@@ -196,7 +196,7 @@ $releaseNotes
     [IO.File]::WriteAllText($releaseNotesPath, $releaseBody, [Text.UTF8Encoding]::new($false))
 
     Invoke-Checked gh release create $tag `
-        --repo RashKash103/container-sentry `
+        --repo RashKash103/container-router `
         --verify-tag `
         --title "Container Router $tag" `
         --notes-file $releaseNotesPath `
@@ -204,7 +204,7 @@ $releaseNotes
         $sourcePath `
         $checksumsPath
 
-    Invoke-Checked gh release view $tag --repo RashKash103/container-sentry --json url --jq .url
+    Invoke-Checked gh release view $tag --repo RashKash103/container-router --json url --jq .url
 }
 finally {
     if ($releaseNotesPath -and (Test-Path $releaseNotesPath)) {
