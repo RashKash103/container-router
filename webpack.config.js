@@ -50,6 +50,14 @@ module.exports = {
 
         })
     ],
+    // Vue feature-detects `global`, which makes webpack emit a runtime helper
+    // that falls back to `new Function('return this')`. The extension only ever
+    // runs in a browser, where `globalThis` exists, and AMO flags the generated
+    // Function constructor as an eval. Leaving `global` unshimmed keeps Vue's
+    // `typeof global` check working while dropping the helper.
+    node: {
+        global: false,
+    },
     watchOptions: {
         ignored: /node_modules/,
     },

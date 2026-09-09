@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - Add an **Open unmatched URLs in a container** preference so the container chooser can be turned off, containing only
   the configured URL pattern mappings.
 - Document how to reproduce the webpack build for addons.mozilla.org source code review.
+- Raise the minimum supported Firefox to 142, the first release where both desktop and Android support the
+  `data_collection_permissions` manifest key the add-on already declares.
+- Stop webpack from emitting its `new Function('return this')` global helper, which add-on review flags as an eval.
 
 ## [v1.0.10]
 
