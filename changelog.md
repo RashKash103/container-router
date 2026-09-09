@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.1.0]
+
+- Rename the extension to Container Router and publish it as a separate add-on with its own extension ID, forked from
+  Container Sentry under the MPL-2.0 license.
 - Add an **Open unmatched URLs in a container** preference so the container chooser can be turned off, containing only
   the configured URL pattern mappings.
+- Document how to reproduce the webpack build for addons.mozilla.org source code review.
 
 ## [v1.0.10]
 

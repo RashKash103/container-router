@@ -101,7 +101,7 @@ try {
         throw "Tag $tag already exists."
     }
 
-    & gh release view $tag --repo abg1979/container-sentry *> $null
+    & gh release view $tag --repo RashKash103/container-sentry *> $null
     if ($LASTEXITCODE -eq 0) {
         throw "GitHub Release $tag already exists."
     }
@@ -145,7 +145,7 @@ try {
     $runId = ''
     for ($attempt = 0; $attempt -lt 30 -and -not $runId; $attempt++) {
         $runId = Get-CheckedOutput gh run list `
-            --repo abg1979/container-sentry `
+            --repo RashKash103/container-sentry `
             --workflow .github/workflows/build.yaml `
             --branch main `
             --commit $commit `
@@ -159,7 +159,7 @@ try {
     if (-not $runId) {
         throw "Timed out waiting for the GitHub Actions run for commit $commit."
     }
-    Invoke-Checked gh run watch $runId --repo abg1979/container-sentry --exit-status
+    Invoke-Checked gh run watch $runId --repo RashKash103/container-sentry --exit-status
 
     Invoke-Checked git tag $tag
     Invoke-Checked git push origin $tag
@@ -168,8 +168,8 @@ try {
     Invoke-Checked mise exec '--' yarn gulp dist
 
     $distPath = Join-Path $repositoryRoot 'dist'
-    $xpiName = "container_sentry-$Version.xpi"
-    $sourceName = "container_sentry-$Version-source.zip"
+    $xpiName = "container_router-$Version.xpi"
+    $sourceName = "container_router-$Version-source.zip"
     $xpiPath = Join-Path $distPath $xpiName
     $sourcePath = Join-Path $distPath $sourceName
     Copy-Item (Join-Path $distPath 'src.zip') $sourcePath
@@ -192,19 +192,19 @@ $releaseNotes
 - ``$sourceName``: source archive for this release
 - ``SHA256SUMS``: SHA-256 checksums for both artifacts
 "@
-    $releaseNotesPath = Join-Path ([IO.Path]::GetTempPath()) "container-sentry-$tag-release-notes.md"
+    $releaseNotesPath = Join-Path ([IO.Path]::GetTempPath()) "container-router-$tag-release-notes.md"
     [IO.File]::WriteAllText($releaseNotesPath, $releaseBody, [Text.UTF8Encoding]::new($false))
 
     Invoke-Checked gh release create $tag `
-        --repo abg1979/container-sentry `
+        --repo RashKash103/container-sentry `
         --verify-tag `
-        --title "Container Sentry $tag" `
+        --title "Container Router $tag" `
         --notes-file $releaseNotesPath `
         $xpiPath `
         $sourcePath `
         $checksumsPath
 
-    Invoke-Checked gh release view $tag --repo abg1979/container-sentry --json url --jq .url
+    Invoke-Checked gh release view $tag --repo RashKash103/container-sentry --json url --jq .url
 }
 finally {
     if ($releaseNotesPath -and (Test-Path $releaseNotesPath)) {

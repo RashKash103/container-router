@@ -1827,9 +1827,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"container-sentry@workspace:.":
+"container-router@workspace:.":
   version: 0.0.0-use.local
-  resolution: "container-sentry@workspace:."
+  resolution: "container-router@workspace:."
   dependencies:
     "@types/firefox-webext-browser": "npm:^120.0.4"
     concurrently: "npm:^9.2.1"

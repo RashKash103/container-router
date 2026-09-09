@@ -1,8 +1,8 @@
 {
-    "name": "container-sentry",
-    "version": "1.0.10",
-    "description": "A Firefox extension to open any URL (not just those with a specific domain) in a multi-account container",
-    "repository": "ssh://git@github.com/abg1979/container-sentry.git",
+    "name": "container-router",
+    "version": "1.1.0",
+    "description": "A Firefox extension to route any URL (not just those with a specific domain) into a multi-account container",
+    "repository": "ssh://git@github.com/RashKash103/container-sentry.git",
     "license": "MPL-2.0",
     "scripts": {
         "start": "concurrently \"webpack --watch\" \"yarn web-ext run --source-dir build/webpack\"",

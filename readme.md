@@ -1,9 +1,14 @@
-# Container Sentry
+# Container Router
 
-Container Sentry is a [Firefox](https://www.mozilla.org/firefox/) extension to open any URL (not just those with a specific domain) in a multi-account
+Container Router is a [Firefox](https://www.mozilla.org/firefox/) extension to open any URL (not just those with a specific domain) in a multi-account
 container. It also allows to specify regular expressions for urls which are allowed to be loaded outside a container.
 
-This was needed because the VPN provider used by my employer opens a local html page which redirects to the authentication page.
+Container Router is a fork of [Container Sentry](https://github.com/abg1979/container-sentry) by abg1979, published separately under the same
+[MPL-2.0](LICENSE) license. It adds an **Open unmatched URLs in a container** preference, so the extension can contain only the URL patterns you
+configure instead of prompting for a container on every uncontained page. It is a distinct add-on with its own extension ID, and it is not affiliated
+with or endorsed by the original author.
+
+The original extension was written because a VPN provider opens a local html page which redirects to the authentication page.
 The [Always in Container](https://addons.mozilla.org/en-US/firefox/addon/always-in-container) extension intercepts this request and breaks the context
 which in the end fails the logon to VPN.
 
@@ -19,7 +24,11 @@ domain.
 
 ## Installation
 
-This extension can be installed at [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/container-sentry/).
+This extension is distributed through [addons.mozilla.org](https://addons.mozilla.org/firefox/). Replace this line with the listing URL once the
+first version has been published.
+
+Container Router and the original Container Sentry use different extension IDs, so both can be installed side by side. They do not share settings:
+each add-on keeps its own URL patterns in its own synced storage.
 
 ## How to use
 
@@ -109,16 +118,52 @@ GitHub Releases are created from a clean, synchronized `main` branch using Power
 `changelog.md`, then run:
 
 ```powershell
-pwsh ./scripts/release.ps1 -Version 1.0.9
+pwsh ./scripts/release.ps1 -Version 1.1.1
 ```
 
 The script updates the package and extension versions, promotes the changelog notes, runs the project checks, commits and waits for CI, creates
 and pushes the version tag, builds the XPI and source archive, generates SHA-256 checksums, and publishes the GitHub Release. It requires
 authenticated `gh`, `git`, and `mise` commands.
 
+### Reproducing the build for AMO review
+
+The packaged extension contains `settings/settings.bundle.js`, which webpack generates and minifies from `src/settings/`. Add-ons that ship generated
+code must be submitted to [addons.mozilla.org](https://addons.mozilla.org/) together with their source. `gulp dist` writes both artifacts: the
+installable `dist/container_router-<version>.xpi` and the matching source archive `dist/src.zip`.
+
+Build environment:
+
+- Any OS with a POSIX shell. This build was produced on Linux with Node 26.8.1; AMO's default reviewer image, Ubuntu 24.04 with Node 24, satisfies
+  the requirements below.
+- [Node.js](https://nodejs.org) 22 or newer. `mise.toml` pins Node 22; newer releases also build the project.
+- [Yarn](https://yarnpkg.com) 4.12.0, pinned in `mise.toml`. Yarn 4 is not published as the `yarn` package on npm; install it from
+  `@yarnpkg/cli-dist`, or through [mise](https://mise.jdx.dev) or `corepack`.
+- No other tooling is required, and no step needs network access beyond the dependency install.
+
+To rebuild from the source archive:
+
+```shell
+npm install --global @yarnpkg/cli-dist@4.12.0
+yarn install --immutable
+yarn gulp build
+```
+
+`yarn` must be on `PATH` for the `gulp` tasks, which shell out to `yarn webpack` and `yarn web-ext build`. To build without installing Yarn globally,
+run the two underlying commands directly:
+
+```shell
+npx --yes @yarnpkg/cli-dist@4.12.0 install --immutable
+npx webpack
+npx web-ext build
+```
+
+Either sequence writes the unpacked extension to `build/webpack/` and the packaged add-on to `dist/`. The contents of `build/webpack/` are what the
+XPI contains, so they can be compared file by file against the uploaded package.
+
 ### Credits
 
-This extension borrows a lot from the following extensions
+This extension is a fork of [Container Sentry](https://github.com/abg1979/container-sentry) by abg1979, which in turn borrows a lot from the
+following extensions
 
 1. <https://addons.mozilla.org/en-US/firefox/addon/always-in-container> | <https://github.com/tiansh/always-in-container>
 2. <https://addons.mozilla.org/en-GB/firefox/addon/open-urls-in-container/> | <https://gitlab.com/hughblackall/open-urls-in-container>

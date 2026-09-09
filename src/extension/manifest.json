@@ -1,11 +1,11 @@
 {
     "manifest_version": 2,
-    "name": "Container Sentry",
-    "version": "1.0.10",
-    "description": "Open urls in a container by default, with exceptions for specific sites. It also allows adding regexes to match urls with containers.",
+    "name": "Container Router",
+    "version": "1.1.0",
+    "description": "Route urls into multi-account containers with regular expressions. Contain every url by default, or only the ones you configure.",
     "developer": {
-        "name": "abg1979",
-        "url": "https://github.com/abg1979/container-sentry"
+        "name": "RashKash103",
+        "url": "https://github.com/RashKash103/container-sentry"
     },
     "default_locale": "en",
     "icons": {
@@ -36,7 +36,7 @@
     "incognito": "not_allowed",
     "browser_specific_settings": {
         "gecko": {
-            "id": "{4a6b7acc-552a-44dc-bf26-bf7f563a1633}",
+            "id": "container-router@rashkash103",
             "strict_min_version": "91.1.0",
             "data_collection_permissions": {
                 "required": [

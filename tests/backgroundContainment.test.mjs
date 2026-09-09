@@ -35,7 +35,7 @@ const loadBackground = async syncStorage => {
         },
         runtime: {
             onMessage: listenerStub(),
-            getURL: resource => `moz-extension://container-sentry${resource}`,
+            getURL: resource => `moz-extension://container-router${resource}`,
             // the MAC addon does not assign any of these URLs
             sendMessage: async () => null,
         },
