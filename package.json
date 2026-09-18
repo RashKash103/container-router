@@ -1,6 +1,6 @@
 {
     "name": "container-router",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A Firefox extension to route any URL (not just those with a specific domain) into a multi-account container",
     "repository": "ssh://git@github.com/RashKash103/container-router.git",
     "license": "MPL-2.0",

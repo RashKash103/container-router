@@ -5,7 +5,8 @@ container. It also allows to specify regular expressions for urls which are allo
 
 Container Router is a fork of [Container Sentry](https://github.com/abg1979/container-sentry) by abg1979, published separately under the same
 [MPL-2.0](LICENSE) license. It adds an **Open unmatched URLs in a container** preference, so the extension can contain only the URL patterns you
-configure instead of prompting for a container on every uncontained page. It is a distinct add-on with its own extension ID, and it is not affiliated
+configure instead of prompting for a container on every uncontained page, and an **Always Ask For Container** list for
+URLs that should always present the container chooser. It is a distinct add-on with its own extension ID, and it is not affiliated
 with or endorsed by the original author.
 
 The original extension was written because a VPN provider opens a local html page which redirects to the authentication page.
@@ -38,15 +39,30 @@ Any url patterns which are to be used with this extension should not have their 
 
 By default the extension asks which container to use for every URL loaded outside a container, unless the URL matches an
 exception. To only contain the URLs you have configured, open the extension preferences and clear **Open unmatched URLs
-in a container**. Every URL that does not match a pattern container mapping then loads normally, and the exceptions list
-is no longer consulted. The setting is synced with the rest of the configuration and is enabled by default.
+in a container**. Every URL that does not match a pattern container mapping or an always-ask pattern then loads
+normally. The setting is synced with the rest of the configuration and is enabled by default.
+
+### Rule precedence
+
+Every top level request is checked against the three lists in a fixed order, and the first list that matches decides
+what happens:
+
+1. **Exceptions** win over everything. A matching URL is left alone and no later rule is considered.
+2. **Always ask** patterns present the container chooser, even when a container mapping would have matched and even when
+   **Open unmatched URLs in a container** is off.
+3. **Pattern container mappings** open the URL in the container they name, using the first mapping that matches.
+
+If nothing matches, **Open unmatched URLs in a container** decides whether the chooser appears or the URL simply loads.
+
+A tab that is already inside a container is never asked about again, whichever list matched, so an always-ask pattern
+prompts once rather than on every navigation.
 
 ### Exceptions
 
 Use the settings page to define url pattern exceptions for which the extension should not try to contain them.
 However if the MAC addon has the host configured to open in a container it may still try to open it in the assigned container.
-Exceptions only matter while **Open unmatched URLs in a container** is enabled, because that is the only mode in which
-unconfigured URLs are contained at all.
+Exceptions are checked before every other rule, so an exception also suppresses a pattern container mapping or an
+always-ask pattern that would otherwise match the same URL.
 
 ### Pattern Container Mappings
 
@@ -64,6 +80,23 @@ Here is the configuration which worked for me:
   - `.+github.com.+corporate_github_org.+` -> Work
   - `.+github.com.+` -> Code
 
+### Always ask for a container
+
+Use the settings page to define url patterns that must always present the container chooser. This is the counterpart to
+the pattern container mappings: a mapping sends a URL to a container you picked in advance, while an always-ask pattern
+lets you decide at the moment you open the page.
+
+These patterns take priority over the pattern container mappings, so a broad mapping can be kept while a narrower
+always-ask pattern carves a specific URL out of it:
+
+- Pattern Container Mappings
+  - `.+github.com.+` -> Code
+- Always Ask For Container
+  - `.+github.com/settings.+`
+
+With that configuration everything on github.com opens in the Code container, except the account settings pages, which
+ask which container to use. Exceptions still take priority over both lists.
+
 ### Discovering redirect URLs
 
 If a login or VPN flow passes through URLs that are difficult to identify, open the extension preferences and use **Discover redirect URLs**:
@@ -71,7 +104,7 @@ If a login or VPN flow passes through URLs that are difficult to identify, open 
 1. Select **Start capture**.
 2. Reproduce the navigation in another tab, choosing a container if prompted.
 3. Return to the preferences and select **Stop capture**.
-4. Review the top-level requests and redirects, then create either a container mapping or an exception from the relevant URL.
+4. Review the top-level requests and redirects, then create a container mapping, an always-ask pattern, or an exception from the relevant URL.
 5. Review the suggested regular expression and add it as a draft. The suggestion uses the URL origin and path while omitting query parameters and fragments by default.
 6. Review the new entry in the configuration and select **Save**.
 

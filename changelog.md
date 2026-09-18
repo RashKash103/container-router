@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.0]
+
+- Add an **Always Ask For Container** list of URL patterns that always present the container chooser. These patterns
+  take priority over the pattern container mappings and apply even when **Open unmatched URLs in a container** is off,
+  while exceptions continue to take priority over both.
+- Offer the new rule type when drafting a rule from a captured redirect URL.
+- Correct the documentation for the exceptions list, which is checked before the container mappings in both modes and
+  so was never limited to the default one.
+
 ## [v1.1.0]
 
 - Rename the extension to Container Router and publish it as a separate add-on with its own extension ID, forked from

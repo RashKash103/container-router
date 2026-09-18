@@ -19,10 +19,12 @@ const listenerStub = () => ({addListener: () => {}})
  * stubs describe an enabled Multi-Account Containers addon, an uncontained
  * current tab, and a single 'Work' container.
  */
-const loadBackground = async syncStorage => {
+const loadBackground = async (syncStorage, {containedTab = false} = {}) => {
     const createdTabs = []
     const removedTabIds = []
     let handleRequest = null
+
+    const tabCookieStoreId = containedTab ? 'firefox-container-9' : 'firefox-default'
 
     const browser = {
         storage: {
@@ -59,14 +61,17 @@ const loadBackground = async syncStorage => {
                 active: true,
                 index: 0,
                 windowId: 1,
-                cookieStoreId: 'firefox-default',
+                cookieStoreId: tabCookieStoreId,
             }),
             create: async options => { createdTabs.push(options); return {id: 99} },
             remove: async id => { removedTabIds.push(id) },
         },
         contextualIdentities: {
             // the default cookie store is not a container, so tabs start uncontained
-            get: async id => { throw new Error(`No container for ${id}`) },
+            get: async id => {
+                if (containedTab && id === tabCookieStoreId) return {cookieStoreId: id, name: 'Existing'}
+                throw new Error(`No container for ${id}`)
+            },
             query: async ({name}) => name === 'Work'
                 ? [{name, cookieStoreId: 'firefox-container-1'}]
                 : [],
@@ -140,4 +145,56 @@ test('excepted URLs load normally regardless of the containment preference', asy
         assert.equal(result, undefined)
         assert.deepEqual(createdTabs, [])
     }
+})
+
+test('always-ask patterns prompt even when containment is disabled', async () => {
+    const {handleRequest, createdTabs, removedTabIds} = await loadBackground({
+        containUnmatchedUrls: false,
+        urlAlwaysAsk: [{id: '1', pattern: '.+bank\\.example\\.com.+'}],
+    })
+
+    const result = await handleRequest(mainFrameRequest('https://bank.example.com/login'))
+
+    assert.equal(result.cancel, true)
+    assert.equal(createdTabs.length, 1)
+    assert.match(createdTabs[0].url, /\/togo\/index\.html\?go=/)
+    assert.deepEqual(removedTabIds, [7])
+})
+
+test('always-ask patterns override a container mapping', async () => {
+    const {handleRequest, createdTabs} = await loadBackground({
+        urlContainerMappings: [{id: '1', pattern: '.+example\\.com.+', containerName: 'Work'}],
+        urlAlwaysAsk: [{id: '2', pattern: '.+example\\.com/settings.+'}],
+    })
+
+    const prompted = await handleRequest(mainFrameRequest('https://example.com/settings/profile'))
+    assert.equal(prompted.cancel, true)
+    assert.match(createdTabs[0].url, /\/togo\/index\.html\?go=/)
+
+    const mapped = await handleRequest(mainFrameRequest('https://example.com/other'))
+    assert.equal(mapped.cancel, true)
+    assert.equal(createdTabs[1].cookieStoreId, 'firefox-container-1')
+})
+
+test('exceptions still win over always-ask patterns', async () => {
+    const {handleRequest, createdTabs} = await loadBackground({
+        urlExceptions: [{id: '1', pattern: '.+example\\.com/sso.+'}],
+        urlAlwaysAsk: [{id: '2', pattern: '.+example\\.com.+'}],
+    })
+
+    const result = await handleRequest(mainFrameRequest('https://example.com/sso/callback'))
+
+    assert.equal(result, undefined)
+    assert.deepEqual(createdTabs, [])
+})
+
+test('always-ask patterns do not re-prompt a tab that is already contained', async () => {
+    const {handleRequest, createdTabs} = await loadBackground({
+        urlAlwaysAsk: [{id: '1', pattern: '.+example\\.com.+'}],
+    }, {containedTab: true})
+
+    const result = await handleRequest(mainFrameRequest('https://example.com/page'))
+
+    assert.equal(result, undefined)
+    assert.deepEqual(createdTabs, [])
 })

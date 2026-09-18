@@ -34,7 +34,8 @@ Or turn off "Open unmatched URLs in a container" in the preferences and the exte
 
 - Regular expression matching against the full URL, including path and query
 - Pattern to container mappings, ordered by priority, where the first match wins
-- Exception patterns for URLs that should never be contained
+- Always-ask patterns for URLs that should always present the container chooser, overriding the mappings
+- Exception patterns for URLs that should never be contained, which take priority over everything else
 - Redirect URL discovery: capture a login or VPN flow, review the top level URLs it passed through, and turn one into a rule with a suggested pattern
 - Optional debug logging for troubleshooting pattern matches
 

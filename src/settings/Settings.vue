@@ -6,8 +6,8 @@
         </label>
         <p>
             When enabled, every URL loaded outside a container asks which container to use unless it matches an
-            exception below. When disabled, only URLs matching a pattern mapping are contained, and every other URL
-            loads normally without a prompt.
+            exception below. When disabled, only URLs matching a pattern mapping or an always-ask pattern are
+            contained, and every other URL loads normally without a prompt.
         </p>
     </section>
     <table>
@@ -51,9 +51,32 @@
     <table>
         <thead>
         <tr>
-            <th colspan="3">URL Container Exceptions
-                <span v-if="!containUnmatchedUrls" class="priority-hint">(unused while unmatched URLs are not contained)</span>
-            </th>
+            <th colspan="3">Always Ask For Container <span class="priority-hint">(overrides the mappings above)</span></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="url in urlAlwaysAsk" :key="url.id">
+            <td>URL Pattern</td>
+            <td><input type="text" v-model="url.pattern"/></td>
+            <td>
+                <button @click="removeUrl(url.id)">Remove</button>
+            </td>
+        </tr>
+        <tr>
+            <td class="actions">
+                <button @click="save">Save</button>
+            </td>
+            <td>&nbsp;</td>
+            <td class="actions">
+                <button @click="addUrlAlwaysAsk">Add Url</button>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    <table>
+        <thead>
+        <tr>
+            <th colspan="3">URL Container Exceptions <span class="priority-hint">(checked first, overrides everything)</span></th>
         </tr>
         </thead>
         <tbody>
@@ -120,6 +143,7 @@
                             :disabled="contextualIdentities.length === 0">
                         Create mapping
                     </button>
+                    <button @click="openRuleDraft(candidateUrl(entry), 'alwaysAsk')">Create always-ask</button>
                     <button @click="openRuleDraft(candidateUrl(entry), 'exception')">Create exception</button>
                 </div>
             </li>
@@ -132,6 +156,7 @@
                 Rule type
                 <select v-model="ruleDraft.type">
                     <option value="mapping">Container mapping</option>
+                    <option value="alwaysAsk">Always ask for container</option>
                     <option value="exception">URL exception</option>
                 </select>
             </label>
@@ -178,6 +203,7 @@ export default {
     data() {
         return {
             urlContainerMappings: [],
+            urlAlwaysAsk: [],
             urlExceptions: [],
             contextualIdentities: [],
             containUnmatchedUrls: true,
@@ -219,13 +245,15 @@ export default {
         },
     },
     async mounted() {
-        const {urlContainerMappings, urlExceptions, containUnmatchedUrls} = await browser.storage.sync.get({
+        const {urlContainerMappings, urlAlwaysAsk, urlExceptions, containUnmatchedUrls} = await browser.storage.sync.get({
             urlContainerMappings: [],
+            urlAlwaysAsk: [],
             urlExceptions: [],
             containUnmatchedUrls: true,
         })
         const {debugLogging} = await browser.storage.local.get({debugLogging: false})
         this.urlContainerMappings = urlContainerMappings
+        this.urlAlwaysAsk = urlAlwaysAsk
         this.urlExceptions = urlExceptions
         this.containUnmatchedUrls = containUnmatchedUrls !== false
         this.debugLogging = debugLogging
@@ -253,6 +281,12 @@ export default {
                 containerName: defaultContainer.name,
             })
         },
+        addUrlAlwaysAsk() {
+            this.urlAlwaysAsk.push({
+                id: uuid(),
+                pattern: '',
+            })
+        },
         addUrlException() {
             this.urlExceptions.push({
                 id: uuid(),
@@ -265,6 +299,11 @@ export default {
                     this.urlContainerMappings.splice(i, 1)
                 }
             }
+            for (let i = this.urlAlwaysAsk.length - 1; i >= 0; i--) {
+                if (this.urlAlwaysAsk[i].pattern === '') {
+                    this.urlAlwaysAsk.splice(i, 1)
+                }
+            }
             for (let i = this.urlExceptions.length - 1; i >= 0; i--) {
                 if (this.urlExceptions[i].pattern === '') {
                     this.urlExceptions.splice(i, 1)
@@ -272,6 +311,7 @@ export default {
             }
             browser.storage.sync.set({
                 urlContainerMappings: toRaw(this.urlContainerMappings),
+                urlAlwaysAsk: toRaw(this.urlAlwaysAsk),
                 urlExceptions: toRaw(this.urlExceptions),
             })
         },
@@ -290,6 +330,9 @@ export default {
             if (changes.urlContainerMappings) {
                 this.urlContainerMappings = changes.urlContainerMappings.newValue
             }
+            if (changes.urlAlwaysAsk) {
+                this.urlAlwaysAsk = changes.urlAlwaysAsk.newValue
+            }
             if (changes.urlExceptions) {
                 this.urlExceptions = changes.urlExceptions.newValue
             }
@@ -299,6 +342,7 @@ export default {
         },
         removeUrl(id) {
             this.urlExceptions = this.urlExceptions.filter(url => url.id !== id)
+            this.urlAlwaysAsk = this.urlAlwaysAsk.filter(url => url.id !== id)
             this.urlContainerMappings = this.urlContainerMappings.filter(url => url.id !== id)
         },
         moveUrlUp(index) {
@@ -398,6 +442,11 @@ export default {
                     id: uuid(),
                     pattern: this.ruleDraft.pattern,
                     containerName: this.ruleDraft.containerName,
+                })
+            } else if (this.ruleDraft.type === 'alwaysAsk') {
+                this.urlAlwaysAsk.push({
+                    id: uuid(),
+                    pattern: this.ruleDraft.pattern,
                 })
             } else {
                 this.urlExceptions.push({

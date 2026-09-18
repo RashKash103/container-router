@@ -168,6 +168,33 @@
     };
 
     /*
+     * URLs matching an always ask pattern always get the container chooser.
+     * These patterns outrank container mappings and the unmatched URL
+     * preference, but not exceptions, which are checked first.
+     */
+    const hasAlwaysAskMatch = async function (url) {
+        if (!macAddonEnabled) return false;
+
+        try {
+            debug("Fetching always ask patterns: ", url);
+            const {urlAlwaysAsk} = await browser.storage.sync.get({urlAlwaysAsk: []});
+            debug("Loaded always ask patterns: ", urlAlwaysAsk);
+            for (const alwaysAsk of urlAlwaysAsk) {
+                if (matchesPattern(url, alwaysAsk.pattern)) {
+                    debug("URL matched always ask pattern:", url, alwaysAsk);
+                    return true;
+                }
+            }
+            debug("No always ask patterns matched for URL:", url);
+            return false;
+        } catch (e) {
+            debug("Error fetching always ask patterns: ", e);
+            // if we cannot fetch the patterns, we fall back to the other rules
+            return false;
+        }
+    };
+
+    /*
      * Containment of unmatched URLs is on by default. When the user turns it
      * off, only URLs matching a container mapping are contained and every other
      * URL loads normally instead of prompting for a container.
@@ -355,26 +382,35 @@
             return void 0;
         }
 
-        // check if url has a container assigned
-        // we will switch to that container if it is assigned.
-        // and remove the current tab.
-        debug("Checking if URL has container assigned: ", request.url);
-        let response = await doURLContainerMatchSwitch(request.url, tab); 
-        if (response?.cancel) {
-            debug("URL has container assigned... switched to it : ", request.url);
-            return {cancel: true};
-        }
-        if (response?.void) {
-            debug("URL has container assigned... already in same : ", request.url);
-            return void 0;
-        }
+        // check if the url must always be chosen by hand. these patterns skip
+        // the container mappings and the unmatched URL preference, so the
+        // chooser below is reached even when neither would contain this url.
+        debug("Checking if URL always asks for a container: ", request.url);
+        const alwaysAsk = await hasAlwaysAskMatch(request.url);
+        if (alwaysAsk) {
+            debug("URL always asks for a container... Skipping mappings: ", request.url);
+        } else {
+            // check if url has a container assigned
+            // we will switch to that container if it is assigned.
+            // and remove the current tab.
+            debug("Checking if URL has container assigned: ", request.url);
+            let response = await doURLContainerMatchSwitch(request.url, tab);
+            if (response?.cancel) {
+                debug("URL has container assigned... switched to it : ", request.url);
+                return {cancel: true};
+            }
+            if (response?.void) {
+                debug("URL has container assigned... already in same : ", request.url);
+                return void 0;
+            }
 
-        // check if the user wants unmatched URLs contained at all. when this is
-        // turned off, the mappings above are the only URLs we contain.
-        debug("Checking if unmatched URLs should be contained: ", request.url);
-        if (!await shouldContainUnmatchedURL(request.url)) {
-            debug("Unmatched URL containment is disabled... Not doing anything: ", request.url);
-            return void 0;
+            // check if the user wants unmatched URLs contained at all. when this is
+            // turned off, the mappings above are the only URLs we contain.
+            debug("Checking if unmatched URLs should be contained: ", request.url);
+            if (!await shouldContainUnmatchedURL(request.url)) {
+                debug("Unmatched URL containment is disabled... Not doing anything: ", request.url);
+                return void 0;
+            }
         }
 
         // check if Multi Account Container is handling this url
