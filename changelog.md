@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.3.0]
+
 - Offer **No container** in the container chooser, which opens the page outside every container. The tab keeps that
   choice while it stays open, so redirects and later navigation are not interrupted.
 - Add a **Containers in the chooser** preference that leaves selected containers out of the chooser. It follows the
