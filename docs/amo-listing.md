@@ -91,3 +91,47 @@ Only the settings page and the background script changed, to add a third list of
 **Known linter warning**
 
 The validator reports one `UNSAFE_VAR_ASSIGNMENT` for an `innerHTML` assignment in `settings/settings.bundle.js`. That line is `insertStaticContent` in Vue's `@vue/runtime-dom` `nodeOps` object, which is bundled unconditionally as part of the framework runtime. The settings page uses no `v-html` and never reaches that code path.
+
+## Version 1.3.0
+
+### Release notes
+
+**Added**
+
+- **No container** in the container chooser. It opens the page outside every container, and the tab keeps that choice for as long as it stays open, so redirects and links followed afterwards are not interrupted.
+- A **Containers in the chooser** preference that leaves containers you clear out of the chooser. It follows the containers defined in Multi-Account Containers, updates while the preferences page is open, and lists containers created later automatically. **No container** is always offered.
+
+### Notes for reviewers
+
+**Source and build**
+
+This add-on bundles its settings page with webpack, so `settings/settings.bundle.js` is generated and minified. The source archive uploaded with this version is `container_router-1.3.0-source.zip`.
+
+The uploaded package and source archive are the artifacts published by this project's release workflow, `.github/workflows/release.yaml`, built on GitHub's `ubuntu-latest` runner with the Node and Yarn versions pinned in `mise.toml` (Node 22, Yarn 4.12.0). They are published with their SHA-256 checksums at:
+
+https://github.com/RashKash103/container-router/releases/tag/v1.3.0
+
+  container_router-1.3.0.xpi         a574d876398166e47ed8c32698072f658465d124efec4338ec5b539cf54981ce
+  container_router-1.3.0-source.zip  7234fea91d6b133c5267519e37168daf95d9874eb27f0e5eeaea990940e76784
+
+To rebuild locally, from the root of the source archive. Yarn 4 is not the `yarn` package on npm, so install it from `@yarnpkg/cli-dist`:
+
+```
+npm install --global @yarnpkg/cli-dist@4.12.0
+yarn install --immutable
+yarn gulp build
+```
+
+Node 22 or newer is required; no other tooling is needed. This writes the unpacked extension to `build/webpack/`, which is exactly what the uploaded XPI contains, so the two can be compared file by file. `readme.md` covers this under "Reproducing the build for AMO review".
+
+**What changed since 1.2.0**
+
+The container chooser (`togo/`) gained an option to open the page outside every container, and the preferences page gained a list of containers to leave out of that chooser. The hidden container names are stored in `browser.storage.sync` alongside the existing URL patterns.
+
+The background script gained one runtime message, `open-uncontained`. The chooser sends it instead of opening the tab itself, because the background script has to record the choice before the tab exists: a tab opened with no container is exactly what this extension intercepts, so without that record the new request would be caught and sent straight back to the chooser. The record is consumed on use, and the tab is remembered only while it is open.
+
+No new permissions are requested. The only change to `manifest.json` in this version is the version number itself. The add-on still collects nothing and contacts no server; all configuration lives in `browser.storage.sync`.
+
+**Known linter warning**
+
+The validator reports one `UNSAFE_VAR_ASSIGNMENT` for an `innerHTML` assignment in `settings/settings.bundle.js`. That line is `insertStaticContent` in Vue's `@vue/runtime-dom` `nodeOps` object, which is bundled unconditionally as part of the framework runtime. The settings page uses no `v-html` and never reaches that code path.
