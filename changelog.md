@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Offer **No container** in the container chooser, which opens the page outside every container. The tab keeps that
+  choice while it stays open, so redirects and later navigation are not interrupted.
+- Add a **Containers in the chooser** preference that leaves selected containers out of the chooser. It follows the
+  containers defined in Multi-Account Containers, updates while the settings page is open, and lists new ones
+  automatically.
+
 - Build and publish releases from GitHub Actions when a version tag is pushed, attaching the extension package, the
   source archive for addons.mozilla.org review, and their SHA-256 checksums.
 - Run the tests and the add-on linter in continuous integration, after the build so the linter has something to read.

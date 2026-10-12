@@ -18,5 +18,9 @@
     "selectDescriptionAfterUrl": {
         "message": "Which container would you prefer",
         "description": "Description of select container; After the url"
+    },
+    "noContainer": {
+        "message": "No container",
+        "description": "Label of the option that opens the page outside every container"
     }
 }

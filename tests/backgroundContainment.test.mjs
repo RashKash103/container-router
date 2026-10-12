@@ -22,6 +22,7 @@ const listenerStub = () => ({addListener: () => {}})
 const loadBackground = async (syncStorage, {containedTab = false} = {}) => {
     const createdTabs = []
     const removedTabIds = []
+    const messageListeners = []
     let handleRequest = null
 
     const tabCookieStoreId = containedTab ? 'firefox-container-9' : 'firefox-default'
@@ -36,7 +37,7 @@ const loadBackground = async (syncStorage, {containedTab = false} = {}) => {
             onChanged: listenerStub(),
         },
         runtime: {
-            onMessage: listenerStub(),
+            onMessage: {addListener: listener => { messageListeners.push(listener) }},
             getURL: resource => `moz-extension://container-router${resource}`,
             // the MAC addon does not assign any of these URLs
             sendMessage: async () => null,
@@ -65,6 +66,7 @@ const loadBackground = async (syncStorage, {containedTab = false} = {}) => {
             }),
             create: async options => { createdTabs.push(options); return {id: 99} },
             remove: async id => { removedTabIds.push(id) },
+            onRemoved: listenerStub(),
         },
         contextualIdentities: {
             // the default cookie store is not a container, so tabs start uncontained
@@ -83,11 +85,20 @@ const loadBackground = async (syncStorage, {containedTab = false} = {}) => {
     await new Promise(resolve => setImmediate(resolve))
     assert.ok(handleRequest, 'the background script registered an onBeforeRequest listener')
 
-    return {handleRequest, createdTabs, removedTabIds}
+    // delivers a runtime message the way browser.runtime.sendMessage would
+    const sendMessage = async (message, sender) => {
+        for (const listener of messageListeners) {
+            const response = listener(message, sender)
+            if (response !== undefined) return response
+        }
+        return undefined
+    }
+
+    return {handleRequest, createdTabs, removedTabIds, sendMessage}
 }
 
 let nextRequestId = 1
-const mainFrameRequest = url => ({tabId: 7, requestId: `request-${nextRequestId++}`, url})
+const mainFrameRequest = (url, tabId = 7) => ({tabId, requestId: `request-${nextRequestId++}`, url})
 
 test('unmatched URLs open the container chooser by default', async () => {
     const {handleRequest, createdTabs, removedTabIds} = await loadBackground({})
@@ -196,5 +207,78 @@ test('always-ask patterns do not re-prompt a tab that is already contained', asy
     const result = await handleRequest(mainFrameRequest('https://example.com/page'))
 
     assert.equal(result, undefined)
+    assert.deepEqual(createdTabs, [])
+})
+
+test('choosing no container opens the url outside every container', async () => {
+    const {createdTabs, removedTabIds, sendMessage} = await loadBackground({})
+
+    const response = await sendMessage(
+        {type: 'open-uncontained', url: 'https://example.com/page'},
+        {tab: {id: 7, active: true, index: 0, windowId: 1}},
+    )
+
+    assert.equal(response.ok, true)
+    assert.equal(createdTabs.length, 1)
+    assert.equal(createdTabs[0].url, 'https://example.com/page')
+    // no cookieStoreId at all, so the tab lands in the default store
+    assert.equal('cookieStoreId' in createdTabs[0], false)
+    // the chooser tab is closed behind it
+    assert.deepEqual(removedTabIds, [7])
+})
+
+test('a tab opened without a container is never asked again', async () => {
+    const {handleRequest, createdTabs, sendMessage} = await loadBackground({})
+
+    await sendMessage(
+        {type: 'open-uncontained', url: 'https://example.com/page'},
+        {tab: {id: 7, active: true, index: 0, windowId: 1}},
+    )
+    const tabsAfterChoice = createdTabs.length
+
+    // the replacement tab, and anything it navigates to afterwards
+    assert.equal(await handleRequest(mainFrameRequest('https://example.com/page', 99)), undefined)
+    assert.equal(await handleRequest(mainFrameRequest('https://elsewhere.example/other', 99)), undefined)
+    assert.equal(createdTabs.length, tabsAfterChoice)
+})
+
+test('the uncontained choice covers a request that arrives before the tab is known', async () => {
+    const {handleRequest, createdTabs, sendMessage} = await loadBackground({})
+
+    await sendMessage(
+        {type: 'open-uncontained', url: 'https://example.com/page'},
+        {tab: {id: 7, active: true, index: 0, windowId: 1}},
+    )
+    const tabsAfterChoice = createdTabs.length
+
+    // a tab id the background has not recorded yet still matches on the url
+    assert.equal(await handleRequest(mainFrameRequest('https://example.com/page', 123)), undefined)
+    assert.equal(createdTabs.length, tabsAfterChoice)
+})
+
+test('the uncontained choice is consumed, so a later visit asks again', async () => {
+    const {handleRequest, createdTabs, sendMessage} = await loadBackground({})
+
+    await sendMessage(
+        {type: 'open-uncontained', url: 'https://example.com/page'},
+        {tab: {id: 7, active: true, index: 0, windowId: 1}},
+    )
+    await handleRequest(mainFrameRequest('https://example.com/page', 123))
+    const tabsAfterChoice = createdTabs.length
+
+    // a fresh tab loading the same url gets the chooser again
+    const result = await handleRequest(mainFrameRequest('https://example.com/page', 456))
+
+    assert.equal(result.cancel, true)
+    assert.equal(createdTabs.length, tabsAfterChoice + 1)
+    assert.match(createdTabs[tabsAfterChoice].url, /\/togo\/index\.html\?go=/)
+})
+
+test('an uncontained choice without a source tab is refused', async () => {
+    const {createdTabs, sendMessage} = await loadBackground({})
+
+    const response = await sendMessage({type: 'open-uncontained', url: 'https://example.com/page'}, {})
+
+    assert.equal(response.ok, false)
     assert.deepEqual(createdTabs, [])
 })

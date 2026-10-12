@@ -5,8 +5,9 @@ container. It also allows to specify regular expressions for urls which are allo
 
 Container Router is a fork of [Container Sentry](https://github.com/abg1979/container-sentry) by abg1979, published separately under the same
 [MPL-2.0](LICENSE) license. It adds an **Open unmatched URLs in a container** preference, so the extension can contain only the URL patterns you
-configure instead of prompting for a container on every uncontained page, and an **Always Ask For Container** list for
-URLs that should always present the container chooser. It is a distinct add-on with its own extension ID, and it is not affiliated
+configure instead of prompting for a container on every uncontained page, an **Always Ask For Container** list for URLs
+that should always present the container chooser, and a chooser that can open a page outside every container and be
+limited to the containers you care about. It is a distinct add-on with its own extension ID, and it is not affiliated
 with or endorsed by the original author.
 
 The original extension was written because a VPN provider opens a local html page which redirects to the authentication page.
@@ -96,6 +97,17 @@ always-ask pattern carves a specific URL out of it:
 
 With that configuration everything on github.com opens in the Code container, except the account settings pages, which
 ask which container to use. Exceptions still take priority over both lists.
+
+### The container chooser
+
+When the extension asks which container to use, the chooser lists every container and you can type the first letters of
+a name to pick one. It also offers **No container**, which opens the page outside every container. A tab opened that way
+is left alone for as long as it stays open, in the same way a tab that is already inside a container is never asked
+about again, so redirects and later navigation in that tab load without interruption.
+
+Use the **Containers in the chooser** section of the settings page to clear any containers you do not want listed. The
+list follows the containers defined in Multi-Account Containers and updates while the settings page is open, and
+containers created later are listed automatically. **No container** is always offered.
 
 ### Discovering redirect URLs
 

@@ -97,6 +97,66 @@
     });
 
     /*
+     * Opening a url without a container has to be remembered, otherwise the new
+     * request would be intercepted and sent straight back to the chooser. The
+     * url is registered before the tab exists so the request cannot outrun it,
+     * and the tab then keeps the choice for as long as it is open, the same way
+     * a contained tab is never asked again.
+     */
+    const UNCONTAINED_MESSAGE_TYPE = 'open-uncontained';
+    const UNCONTAINED_ALLOWANCE_MS = 15000;
+    const uncontainedTabs = new Set();
+    const pendingUncontainedUrls = new Map();
+
+    const rememberUncontainedUrl = url => {
+        const now = Date.now();
+        for (const [pending, requestedAt] of pendingUncontainedUrls) {
+            if (now - requestedAt > UNCONTAINED_ALLOWANCE_MS) {
+                pendingUncontainedUrls.delete(pending);
+            }
+        }
+        pendingUncontainedUrls.set(url, now);
+    };
+
+    const takeUncontainedUrl = url => {
+        const requestedAt = pendingUncontainedUrls.get(url);
+        if (requestedAt === undefined) return false;
+        pendingUncontainedUrls.delete(url);
+        return Date.now() - requestedAt <= UNCONTAINED_ALLOWANCE_MS;
+    };
+
+    const openUncontained = async function (message, sender) {
+        const url = typeof message.url === 'string' ? message.url : '';
+        const chooserTab = sender.tab;
+        if (!url || !chooserTab) {
+            return {ok: false, error: 'Opening without a container needs a url and the tab that asked.'};
+        }
+
+        rememberUncontainedUrl(url);
+        try {
+            const {active, index, windowId} = chooserTab;
+            const tab = await browser.tabs.create({url, active, index, windowId});
+            uncontainedTabs.add(tab.id);
+            debug("Opened url without a container: ", url, tab.id);
+            await browser.tabs.remove(chooserTab.id);
+            return {ok: true};
+        } catch (e) {
+            pendingUncontainedUrls.delete(url);
+            debug("Unable to open the url without a container: ", e);
+            return {ok: false, error: `${e}`};
+        }
+    };
+
+    browser.runtime.onMessage.addListener((message, sender) => {
+        if (!message || message.type !== UNCONTAINED_MESSAGE_TYPE) return undefined;
+        return openUncontained(message, sender);
+    });
+
+    browser.tabs.onRemoved.addListener(tabId => {
+        uncontainedTabs.delete(tabId);
+    });
+
+    /*
      * Ignore any pages which were assigned in Multi-Account Containers (MAC)
      */
     const MAC_ADDON_ID = '@testpilot-containers';
@@ -356,6 +416,18 @@
         const tab = await browser.tabs.get(request.tabId);
         if (tab.incognito) {
             debug("Incognito Tab cannot be contained: ", request.url);
+            return void 0;
+        }
+
+        // the user chose to open this url outside a container, either for this
+        // request or earlier for this whole tab.
+        if (uncontainedTabs.has(request.tabId)) {
+            debug("Tab was opened without a container... Not doing anything: ", request.url);
+            return void 0;
+        }
+        if (takeUncontainedUrl(request.url)) {
+            debug("URL was chosen to open without a container: ", request.url);
+            uncontainedTabs.add(request.tabId);
             return void 0;
         }
 

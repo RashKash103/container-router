@@ -99,6 +99,27 @@
         </tbody>
     </table>
 
+    <section class="container-visibility">
+        <h2>Containers in the chooser</h2>
+        <p v-if="contextualIdentities.length === 0">
+            No containers exist yet. Create them in Multi-Account Containers and they will appear here.
+        </p>
+        <ul v-else class="container-choices">
+            <li v-for="container in contextualIdentities" :key="container.cookieStoreId">
+                <label>
+                    <input type="checkbox"
+                           :checked="!hiddenContainers.includes(container.name)"
+                           @change="setContainerVisible(container.name, $event.target.checked)"/>
+                    {{ container.name }}
+                </label>
+            </li>
+        </ul>
+        <p>
+            Cleared containers are left out of the container chooser. Containers you create later are shown
+            automatically, and the chooser always offers to open a page without a container.
+        </p>
+    </section>
+
     <section class="url-discovery">
         <h2>Discover redirect URLs</h2>
         <p>
@@ -206,6 +227,7 @@ export default {
             urlAlwaysAsk: [],
             urlExceptions: [],
             contextualIdentities: [],
+            hiddenContainers: [],
             containUnmatchedUrls: true,
             debugLogging: false,
             discoverySession: {
@@ -245,20 +267,27 @@ export default {
         },
     },
     async mounted() {
-        const {urlContainerMappings, urlAlwaysAsk, urlExceptions, containUnmatchedUrls} = await browser.storage.sync.get({
-            urlContainerMappings: [],
-            urlAlwaysAsk: [],
-            urlExceptions: [],
-            containUnmatchedUrls: true,
-        })
+        const {urlContainerMappings, urlAlwaysAsk, urlExceptions, containUnmatchedUrls, hiddenContainers} =
+            await browser.storage.sync.get({
+                urlContainerMappings: [],
+                urlAlwaysAsk: [],
+                urlExceptions: [],
+                containUnmatchedUrls: true,
+                hiddenContainers: [],
+            })
         const {debugLogging} = await browser.storage.local.get({debugLogging: false})
         this.urlContainerMappings = urlContainerMappings
         this.urlAlwaysAsk = urlAlwaysAsk
         this.urlExceptions = urlExceptions
         this.containUnmatchedUrls = containUnmatchedUrls !== false
+        this.hiddenContainers = hiddenContainers
         this.debugLogging = debugLogging
         browser.storage.onChanged.addListener(this.syncStorage)
-        this.contextualIdentities = await browser.contextualIdentities.query({})
+        // keep the list in step with containers added or renamed while this page is open
+        browser.contextualIdentities.onCreated.addListener(this.refreshContainers)
+        browser.contextualIdentities.onRemoved.addListener(this.refreshContainers)
+        browser.contextualIdentities.onUpdated.addListener(this.refreshContainers)
+        await this.refreshContainers()
         await this.refreshDiscovery()
         if (this.discoverySession.active) {
             this.startDiscoveryPolling()
@@ -266,6 +295,9 @@ export default {
     },
     unmounted() {
         browser.storage.onChanged.removeListener(this.syncStorage)
+        browser.contextualIdentities.onCreated.removeListener(this.refreshContainers)
+        browser.contextualIdentities.onRemoved.removeListener(this.refreshContainers)
+        browser.contextualIdentities.onUpdated.removeListener(this.refreshContainers)
         this.stopDiscoveryPolling()
     },
     methods: {
@@ -315,6 +347,19 @@ export default {
                 urlExceptions: toRaw(this.urlExceptions),
             })
         },
+        async refreshContainers() {
+            this.contextualIdentities = await browser.contextualIdentities.query({})
+        },
+        async setContainerVisible(name, visible) {
+            const hidden = this.hiddenContainers.filter(entry => entry !== name)
+            if (!visible) {
+                hidden.push(name)
+            }
+            this.hiddenContainers = hidden
+            await browser.storage.sync.set({
+                hiddenContainers: toRaw(this.hiddenContainers),
+            })
+        },
         async saveContainUnmatchedUrls() {
             await browser.storage.sync.set({
                 containUnmatchedUrls: this.containUnmatchedUrls,
@@ -335,6 +380,9 @@ export default {
             }
             if (changes.urlExceptions) {
                 this.urlExceptions = changes.urlExceptions.newValue
+            }
+            if (changes.hiddenContainers) {
+                this.hiddenContainers = changes.hiddenContainers.newValue || []
             }
             if (changes.containUnmatchedUrls) {
                 this.containUnmatchedUrls = changes.containUnmatchedUrls.newValue !== false
@@ -596,9 +644,30 @@ select:focus-visible {
 }
 
 .containment-settings,
+.container-visibility,
 .url-discovery,
 .debug-settings {
     margin: 20px 0;
+}
+
+.container-visibility {
+    background-color: var(--surface-background);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 16px;
+}
+
+.container-visibility h2 {
+    margin-top: 0;
+}
+
+.container-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 .url-discovery {
@@ -695,11 +764,13 @@ code {
 .priority-hint,
 .tab-id,
 .containment-settings p,
+.container-visibility p,
 .debug-settings p {
     color: var(--muted-text-color);
 }
 
 .containment-settings p,
+.container-visibility p,
 .debug-settings p {
     margin-top: 6px;
 }

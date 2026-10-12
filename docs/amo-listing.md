@@ -37,6 +37,7 @@ Or turn off "Open unmatched URLs in a container" in the preferences and the exte
 - Always-ask patterns for URLs that should always present the container chooser, overriding the mappings
 - Exception patterns for URLs that should never be contained, which take priority over everything else
 - Redirect URL discovery: capture a login or VPN flow, review the top level URLs it passed through, and turn one into a rule with a suggested pattern
+- A container chooser that can also open a page outside every container, and that can be limited to the containers you choose
 - Optional debug logging for troubleshooting pattern matches
 
 **Requirements**

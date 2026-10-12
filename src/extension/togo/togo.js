@@ -23,12 +23,35 @@
     }
     document.getElementById('redirect-url').appendChild(document.createTextNode(url));
 
+    const UNCONTAINED_MESSAGE_TYPE = 'open-uncontained';
+
     // this will store a string of keys pressed when searching for contexts to
     // switch to.
     let contextPrefix = '';
 
+    // containers the preferences page has hidden are left out of the list
+    const hiddenContainers = await (async function () {
+        try {
+            const stored = await browser.storage.sync.get({hiddenContainers: []});
+            return new Set(stored.hiddenContainers.map(name => name + ''));
+        } catch (e) {
+            console.warn("Unable to load the hidden containers, showing all of them:", e);
+            return new Set();
+        }
+    }());
+
     /** @type {Array<{ name: string, icon: string, iconUrl: string, color: string, colorCode: string, cookieStoreId: string }>} */
-    const contexts = await browser.contextualIdentities.query({});
+    const contexts = (await browser.contextualIdentities.query({}))
+        .filter(context => !hiddenContainers.has(context.name));
+
+    // the containers, followed by the option to open the url outside any of them
+    const options = [
+        ...contexts,
+        {
+            name: browser.i18n.getMessage('noContainer') || 'No container',
+            cookieStoreId: null,
+        },
+    ];
 
     /** @type {HTMLUListElement} */
     const ul = document.getElementById('container-list');
@@ -42,6 +65,31 @@
         await browser.tabs.remove(current.id);
     };
 
+    // the background script has to open this one: it records that the url was
+    // chosen to load outside a container before the tab exists, so the new
+    // request is not intercepted and sent back to this page.
+    const openWithoutContainer = async function () {
+        const response = await browser.runtime.sendMessage({
+            type: UNCONTAINED_MESSAGE_TYPE,
+            url: url + '',
+        });
+        if (!response || !response.ok) {
+            throw new Error(response?.error || 'The background script did not open the tab.');
+        }
+    };
+
+    const chooseOption = async function (option) {
+        try {
+            if (option.cookieStoreId) {
+                await switchContainer(option.cookieStoreId);
+            } else {
+                await openWithoutContainer();
+            }
+        } catch (e) {
+            console.error("Unable to open the page:", e);
+        }
+    };
+
     document.addEventListener('click', async event => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -49,9 +97,9 @@
         if (!button) return;
         event.stopPropagation();
         event.preventDefault();
-        const cookieStoreId = button.dataset.cookieStoreId;
-        if (!cookieStoreId) return;
-        await switchContainer(cookieStoreId);
+        const option = options[Number.parseInt(button.dataset.optionIndex, 10)];
+        if (!option) return;
+        await chooseOption(option);
     }, true);
 
     const renderPrefix = function (contextPrefix) {
@@ -103,12 +151,12 @@
 
         if (contextPrefix === '') return;
 
-        // find out all matching contexts for the current prefix
-        const matching = contexts.filter(context => context.name.toLowerCase().startsWith(contextPrefix));
+        // find out all matching options for the current prefix
+        const matching = options.filter(option => option.name.toLowerCase().startsWith(contextPrefix));
 
         // open the tab if there is one and only one matching
         if (matching.length === 1) {
-            await switchContainer(matching[0].cookieStoreId);
+            await chooseOption(matching[0]);
         } else {
             if (matching.length === 0) {
                 contextPrefix = '';
@@ -118,7 +166,7 @@
         }
     }, true);
 
-    const contextElementList = contexts.map((context, index) => {
+    const contextElementList = options.map((context, index) => {
         const li = document.createElement('li');
         const button = document.createElement('button');
         button.type = 'button';
@@ -130,7 +178,7 @@
          * We use svg color matrix filter to color the icon correctly
          */
         /** @type {SVGSVGElement} */
-        const iconSvg = new DOMParser().parseFromString(`
+        const iconSvg = context.cookieStoreId ? new DOMParser().parseFromString(`
 <svg viewBox="0 0 32 32" color-interpolation-filters="sRGB" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <filter id="filter-${index}"><feColorMatrix type="matrix" values="${(function () {
             const hexColor = context.colorCode.replace(/[^0-9A-Fa-f]*/g, '');
@@ -139,6 +187,11 @@
             return `0 0 0 0 ${red} 0 0 0 0 ${green} 0 0 0 0 ${blue} 0 0 0 1 0`;
         }())}" /></filter>
   <image xlink:href="${context.iconUrl}" filter="url(#filter-${index})" width="32px" height="32px" />
+</svg>
+`, 'image/svg+xml').documentElement : new DOMParser().parseFromString(`
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="3" />
+  <line x1="7" y1="7" x2="25" y2="25" stroke="currentColor" stroke-width="3" />
 </svg>
 `, 'image/svg+xml').documentElement;
         const icon = document.createElement('span');
@@ -153,7 +206,12 @@
         button.appendChild(name);
 
         ul.appendChild(li);
-        button.dataset.cookieStoreId = context.cookieStoreId;
+        button.dataset.optionIndex = index + '';
+        if (context.cookieStoreId) {
+            button.dataset.cookieStoreId = context.cookieStoreId;
+        } else {
+            li.classList.add('no-container');
+        }
         return li;
     });
 }());
