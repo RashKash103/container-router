@@ -29,5 +29,13 @@ jobs:
             - name: Install dependencies
               run: yarn install --immutable
 
+            - name: Test
+              run: yarn test
+
+            # Builds before linting: web-ext lint reads build/webpack, which
+            # does not exist until the build has run.
             - name: Build
               run: gulp dist
+
+            - name: Lint
+              run: yarn lint

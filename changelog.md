@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Build and publish releases from GitHub Actions when a version tag is pushed, attaching the extension package, the
+  source archive for addons.mozilla.org review, and their SHA-256 checksums.
+- Run the tests and the add-on linter in continuous integration, after the build so the linter has something to read.
+- Replace the PowerShell release script with `scripts/prepare-release.sh`, which only promotes the changelog, sets the
+  version, and pushes the tag that the release workflow reacts to.
+
 ## [v1.2.0]
 
 - Add an **Always Ask For Container** list of URL patterns that always present the container chooser. These patterns

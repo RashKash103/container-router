@@ -1,0 +1,116 @@
+# github workflow for publishing a release when a version tag is pushed
+name: release
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+permissions:
+    contents: write
+
+jobs:
+    tag-release:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v7
+
+            - name: Setup mise
+              uses: jdx/mise-action@v4
+              with:
+                install: true         # run `mise install`
+                cache: true           # enable caching
+                experimental: true    # optional: enable experimental features
+
+            - name: Read the version from the tag
+              id: release
+              run: |
+                  tag="$GITHUB_REF_NAME"
+                  version="${tag#v}"
+                  if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      echo "::error::Tag $tag is not a vMAJOR.MINOR.PATCH tag."
+                      exit 1
+                  fi
+                  echo "tag=$tag" >> "$GITHUB_OUTPUT"
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Verify the packaged versions match the tag
+              env:
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  status=0
+                  for file in package.json src/extension/manifest.json; do
+                      packaged=$(node -p "require('./$file').version")
+                      if [ "$packaged" != "$VERSION" ]; then
+                          echo "::error file=$file::$file is version $packaged, but the tag asks for $VERSION."
+                          status=1
+                      fi
+                  done
+                  exit $status
+
+            - name: Install dependencies
+              run: yarn install --immutable
+
+            - name: Test
+              run: yarn test
+
+            # Builds before linting: web-ext lint reads build/webpack, which
+            # does not exist until the build has run.
+            - name: Build
+              run: gulp dist
+
+            - name: Lint
+              run: yarn lint
+
+            - name: Collect the release artifacts
+              env:
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  mv "dist/src.zip" "dist/container_router-$VERSION-source.zip"
+                  cd dist
+                  sha256sum \
+                      "container_router-$VERSION.xpi" \
+                      "container_router-$VERSION-source.zip" > SHA256SUMS
+                  cat SHA256SUMS
+
+            - name: Build the release notes
+              env:
+                  TAG: ${{ steps.release.outputs.tag }}
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  awk -v section="## [$TAG]" '
+                      $0 == section { found = 1; next }
+                      found && /^## \[/ { exit }
+                      found && (NF || started) { started = 1; print }
+                  ' changelog.md > section.md
+                  if ! grep -q '[^[:space:]]' section.md; then
+                      echo "::error file=changelog.md::changelog.md has no release notes under '## [$TAG]'."
+                      exit 1
+                  fi
+                  {
+                      echo "## What's new"
+                      echo
+                      cat section.md
+                      echo "## Downloads"
+                      echo
+                      echo "- \`container_router-$VERSION.xpi\`: the Firefox extension package"
+                      echo "- \`container_router-$VERSION-source.zip\`: the source archive addons.mozilla.org requires for review"
+                      echo "- \`SHA256SUMS\`: SHA-256 checksums for both artifacts"
+                  } > release-notes.md
+                  cat release-notes.md
+
+            - name: Publish the GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ steps.release.outputs.tag }}
+                  VERSION: ${{ steps.release.outputs.version }}
+              run: |
+                  gh release create "$TAG" \
+                      --verify-tag \
+                      --title "Container Router $TAG" \
+                      --notes-file release-notes.md \
+                      "dist/container_router-$VERSION.xpi" \
+                      "dist/container_router-$VERSION-source.zip" \
+                      dist/SHA256SUMS
+                  gh release view "$TAG" --json url --jq .url

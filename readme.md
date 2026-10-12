@@ -147,16 +147,24 @@ in `dist/`.
 
 ### Releasing
 
-GitHub Releases are created from a clean, synchronized `main` branch using PowerShell 7. Add the release notes under `Unreleased` in
-`changelog.md`, then run:
+Releases are built and published by GitHub Actions. Add the release notes under `Unreleased` in `changelog.md` and commit them, then from a clean,
+synchronized `main` branch run:
 
-```powershell
-pwsh ./scripts/release.ps1 -Version 1.1.1
+```shell
+./scripts/prepare-release.sh 1.3.0
 ```
 
-The script updates the package and extension versions, promotes the changelog notes, runs the project checks, commits and waits for CI, creates
-and pushes the version tag, builds the XPI and source archive, generates SHA-256 checksums, and publishes the GitHub Release. It requires
-authenticated `gh`, `git`, and `mise` commands.
+The script promotes the `Unreleased` notes into a section for the new tag, sets the version in `package.json` and `src/extension/manifest.json`,
+commits, and pushes `main` followed by the `v1.3.0` tag. Pass `--dry-run` to see the edits it would make without committing or pushing anything.
+
+Pushing a `v*` tag runs `.github/workflows/release.yaml`, which checks that the tag matches the packaged version, installs dependencies, runs the
+tests, builds, lints, and publishes a GitHub Release containing:
+
+- `container_router-<version>.xpi`, the package to upload to addons.mozilla.org
+- `container_router-<version>-source.zip`, the source archive required for review
+- `SHA256SUMS`, SHA-256 checksums for both
+
+If the workflow fails, remove the tag with `git tag -d v1.3.0 && git push origin :refs/tags/v1.3.0`, fix the problem, and prepare the release again.
 
 ### Reproducing the build for AMO review
 
@@ -166,8 +174,8 @@ installable `dist/container_router-<version>.xpi` and the matching source archiv
 
 Build environment:
 
-- Any OS with a POSIX shell. This build was produced on Linux with Node 26.8.1; AMO's default reviewer image, Ubuntu 24.04 with Node 24, satisfies
-  the requirements below.
+- Any OS with a POSIX shell. The published artifacts are built by `.github/workflows/release.yaml` on GitHub's `ubuntu-latest` runner using the
+  Node and Yarn versions pinned in `mise.toml`. AMO's default reviewer image, Ubuntu 24.04 with Node 24, satisfies the requirements below.
 - [Node.js](https://nodejs.org) 22 or newer. `mise.toml` pins Node 22; newer releases also build the project.
 - [Yarn](https://yarnpkg.com) 4.12.0, pinned in `mise.toml`. Yarn 4 is not published as the `yarn` package on npm; install it from
   `@yarnpkg/cli-dist`, or through [mise](https://mise.jdx.dev) or `corepack`.
